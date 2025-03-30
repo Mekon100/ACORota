@@ -31,6 +31,7 @@ def generate_rota(dates, staff, closure_days):
     Generate a rota with one shift per day.
     Avoid assigning a staff member on consecutive working days if possible.
     Randomly choose among candidates with the same minimum shift count.
+    Notes will include information on staff holidays.
     """
     rota_data = []
     last_assigned_staff = None  # Track the staff assigned on the previous working day.
@@ -42,11 +43,16 @@ def generate_rota(dates, staff, closure_days):
             'Shift': None,
             'Notes': ''
         }
-        # Mark closure days.
+        # Check for closure days.
         if date in closure_days:
-            entry['Notes'] = 'University Closure'
+            note = "University Closure"
+            # Also note if any staff have a holiday on this day.
+            holiday_names = [s['name'] for s in staff if date in s['holidays']]
+            if holiday_names:
+                note += " | On Holiday: " + ", ".join(holiday_names)
+            entry['Notes'] = note
             entry['Shift'] = 'CLOSED'
-            last_assigned_staff = None  # Reset the consecutive assignment chain.
+            last_assigned_staff = None  # Reset consecutive assignment chain.
             rota_data.append(entry)
             continue
 
@@ -94,7 +100,15 @@ def generate_rota(dates, staff, closure_days):
             selected['assigned_dates'].add(date)
             selected['shift_count'] += 1
             last_assigned_staff = selected['name']
-
+        
+        # Append holiday information to the notes for this date.
+        holiday_names = [s['name'] for s in staff if date in s['holidays']]
+        if holiday_names:
+            if entry['Notes']:
+                entry['Notes'] += " | On Holiday: " + ", ".join(holiday_names)
+            else:
+                entry['Notes'] = "On Holiday: " + ", ".join(holiday_names)
+                
         rota_data.append(entry)
     return pd.DataFrame(rota_data)
 
@@ -124,7 +138,7 @@ target_date = st.date_input("Select any date in the target month", value=datetim
 year = target_date.year
 month = target_date.month
 
-# Generate all dates for the month (for use in holiday and closure selections)
+# Generate all dates for the month (for holiday and closure selections)
 all_dates = generate_all_dates(year, month)
 all_date_strings = [d.strftime('%d/%m/%Y') for d in all_dates]
 
